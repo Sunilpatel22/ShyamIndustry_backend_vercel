@@ -1,4 +1,4 @@
-// routes/cart.routes.js
+
 import express from 'express';
 import { addToCart, getCart, updateCartQuantity, removeFromCart } from '../controllers/cart.controller.js';
 import { jwtAuthMiddleware } from '../middleware/jwtAuthMiddleware.js';
