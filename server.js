@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path'; 
+import fs from 'fs'; // 🎯 Added to safely check local uploads directory
 import db from './config/db.js'; 
 import userRouter from './router/userRouter.js';
 import productRouter from './router/productRouter.js';
@@ -20,7 +21,11 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// 🎯 Safe local static folder loading (only attaches if the directory exists)
+const uploadsPath = path.join(process.cwd(), 'uploads');
+if (fs.existsSync(uploadsPath)) {
+  app.use('/uploads', express.static(uploadsPath));
+}
 
 app.get('/', (req, res) => {
   res.send(`Hello Sunil! Running in ${process.env.NODE_ENV || 'development'} mode.`);
@@ -32,6 +37,12 @@ app.use('/cart', cartRouter);
 app.use('/wishlist', wishlistRouter);
 app.use('/profile', profileRouter);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running in [${process.env.NODE_ENV || 'development'}] mode on port ${PORT}`);
-});
+// 🎯 Conditional listen: Avoids locking port issues during Vercel builds
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running in [${process.env.NODE_ENV || 'development'}] mode on port ${PORT}`);
+  });
+}
+
+// 🎯 CRITICAL FOR VERCEL: Export the application instance
+export default app;
