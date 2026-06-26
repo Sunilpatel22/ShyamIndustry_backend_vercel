@@ -1,6 +1,6 @@
 import { generateToken } from "../middleware/jwtAuthMiddleware.js";
 import User from "../models/userSchema.js";
-import Profile from "../models/profileSchema.js"; // 🎯 IMPORTED PROFILE SCHEMA
+import Profile from "../models/profileSchema.js";
 
 // ==========================================
 // 1. SIGNUP CONTROLLER (AUTOMATIC PROFILE INITIALIZATION)
