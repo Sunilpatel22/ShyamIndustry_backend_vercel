@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 
 // Dynamic CORS based on loaded environment file
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || 'https://shyamindustries.vercel.app',
   credentials: true
 }));
 
