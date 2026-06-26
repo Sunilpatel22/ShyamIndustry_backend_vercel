@@ -15,8 +15,23 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Dynamic CORS based on loaded environment file
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://shyamindustries.vercel.app',
+  process.env.CLIENT_URL
+].filter(Boolean); // Cleans out any undefined/null values safely
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'https://shyamindustries.vercel.app',
+  origin: function (origin, callback) {
+    // Allows requests with no origin (like mobile apps, Postman, curl, or internal server calls)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Blocked by security rules (CORS mismatch)'));
+    }
+  },
   credentials: true
 }));
 
