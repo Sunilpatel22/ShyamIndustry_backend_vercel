@@ -2,8 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path'; 
-import fs from 'fs'; // 🎯 Added to safely check local uploads directory
-import db from './config/db.js'; 
+import fs from 'fs'; 
+// 🎯 CHANGED: Import the database connection function instead of a static object
+import connectDB from './config/db.js'; 
 import userRouter from './router/userRouter.js';
 import productRouter from './router/productRouter.js';
 import cartRouter from './router/cartRouter.js';
@@ -27,8 +28,21 @@ if (fs.existsSync(uploadsPath)) {
   app.use('/uploads', express.static(uploadsPath));
 }
 
+// 🎯 ADDED: Middleware to ensure MongoDB is connected before processing ANY request on Vercel
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ 
+      error: "Database Connection Error", 
+      details: process.env.NODE_ENV !== 'production' ? err.message : "Could not connect to database backend"
+    });
+  }
+});
+
 app.get('/', (req, res) => {
-  res.send(`Hello Sunil! Running in ${process.env.NODE_ENV || 'development'} mode.`);
+  res.send(`Hello Sunil! Running in ${process.env.NODE_ENV || 'production'} mode.`);
 });
 
 app.use('/user', userRouter);

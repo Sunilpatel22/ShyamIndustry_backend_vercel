@@ -8,17 +8,40 @@ if (!mongoURL) {
   process.exit(1); 
 }
 
-mongoose.connect(mongoURL);
+// Global cache object to persist connection state across serverless invocations
+let cached = global.mongoose;
 
-const db = mongoose.connection;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
-db.on('connected', () => {
-  const dbName = mongoose.connection.name;
-  const envMode = process.env.NODE_ENV || 'development';
-  console.log(`✅ Connected to MongoDB Server [Database: ${dbName}] [Env: ${envMode}]`);
-});
+async function connectDB() {
+  // If a connection already exists, reuse it immediately
+  if (cached.conn) {
+    return cached.conn;
+  }
 
-db.on('error', (err) => console.error('❌ MongoDB Connection Error:', err));
-db.on('disconnected', () => console.log('⚠️ MongoDB Disconnected'));
+  // If a connection is already in progress, wait for it
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false, // Turn off buffering to surface errors instantly
+    };
 
-export default db;
+    cached.promise = mongoose.connect(mongoURL, opts).then((mongooseInstance) => {
+      console.log(`✅ Connected to MongoDB Server [Database: ${mongooseInstance.connection.name}]`);
+      return mongooseInstance;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    console.error('❌ MongoDB Connection Error:', e);
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+export default connectDB;
