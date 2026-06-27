@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 
 // Dynamic CORS based on loaded environment file
 const allowedOrigins = [
-  'http://localhost:5174',
+  'http://localhost:5173',
   'https://shyamindustries.vercel.app',
   process.env.CLIENT_URL
 ].filter(Boolean); // Cleans out any undefined/null values safely
