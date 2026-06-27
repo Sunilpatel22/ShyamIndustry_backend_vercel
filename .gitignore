@@ -8,6 +8,7 @@ uploads/
 .tmp/
 
 # Environment Variables & Secrets
+# Environment Variables & Secrets
 .env
 .env.local
 .env.development

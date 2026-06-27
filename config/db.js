@@ -1,13 +1,6 @@
 import mongoose from 'mongoose';
 import 'dotenv/config';
 
-const mongoURL = process.env.MONGODB_URI;
-
-if (!mongoURL) {
-  console.error("❌ Critical Error: MONGODB_URI environment variable is completely missing!");
-  process.exit(1); 
-}
-
 // Global cache object to persist connection state across serverless invocations
 let cached = global.mongoose;
 
@@ -16,6 +9,13 @@ if (!cached) {
 }
 
 async function connectDB() {
+  const mongoURL = process.env.MONGODB_URI;
+
+  // 🎯 FIXED: Moved check inside the function so it doesn't crash Vercel during builds/initialization
+  if (!mongoURL) {
+    throw new Error("❌ Critical Error: MONGODB_URI environment variable is completely missing!");
+  }
+
   // If a connection already exists, reuse it immediately
   if (cached.conn) {
     return cached.conn;
