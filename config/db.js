@@ -1,47 +1,49 @@
 import mongoose from 'mongoose';
 import 'dotenv/config';
 
-// Global cache object to persist connection state across serverless invocations
+// 🎯 GLOBAL INSTANCE CACHE: Reuses existing connection structures across serverless executions
 let cached = global.mongoose;
 
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
-async function connectDB() {
+const connectDB = async () => {
   const mongoURL = process.env.MONGODB_URI;
 
-  // 🎯 FIXED: Moved check inside the function so it doesn't crash Vercel during builds/initialization
+  // 🎯 FIXED: Throw standard JS errors instead of calling process.exit(1) to protect Vercel cloud builds
   if (!mongoURL) {
-    throw new Error("❌ Critical Error: MONGODB_URI environment variable is completely missing!");
+    throw new Error("❌ Critical Error: MONGODB_URI environment variable is missing!");
   }
 
-  // If a connection already exists, reuse it immediately
+  // If a connection layer is already initialized, reuse it instantly
   if (cached.conn) {
     return cached.conn;
   }
 
-  // If a connection is already in progress, wait for it
+  // If a connection is actively being resolved right now, wait for it instead of spinning up a duplicate
   if (!cached.promise) {
     const opts = {
-      bufferCommands: false, // Turn off buffering to surface errors instantly
+      bufferCommands: true, // Prevents model processing execution errors on slower warmups
     };
 
     cached.promise = mongoose.connect(mongoURL, opts).then((mongooseInstance) => {
-      console.log(`✅ Connected to MongoDB Server [Database: ${mongooseInstance.connection.name}]`);
+      const dbName = mongooseInstance.connection.name;
+      const envMode = process.env.NODE_ENV || 'development';
+      console.log(`✅ Connected to MongoDB Server [Database: ${dbName}] [Env: ${envMode}]`);
       return mongooseInstance;
     });
   }
 
   try {
     cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    console.error('❌ MongoDB Connection Error:', e);
-    throw e;
+  } catch (error) {
+    cached.promise = null; // Resets cache to retry cleanly on future failures
+    console.error('❌ MongoDB Connection Handshake Error:', error);
+    throw error;
   }
 
   return cached.conn;
-}
+};
 
 export default connectDB;

@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema({
     mobileNumber: {
         type: String,
         required: true,
-        unique: true,
+       
         trim: true,
         match: [/^\d{10}$/, "Please fill a valid 10-digit mobile number"] // Custom regex verification rule
     },

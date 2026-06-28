@@ -1,6 +1,22 @@
 import Profile from "../models/profileSchema.js";
-import fs from 'fs';
-import path from 'path';
+import crypto from "crypto";
+
+// 🎯 INTERNAL HELPER: Converts memory buffers into a shortened hostname string URL
+const generateShortImageUrl = (req) => {
+  if (!req.file) return "";
+
+  // 1. Generate a small 8-character unique fingerprint filename
+  const shortId = crypto.randomBytes(4).toString("hex"); 
+  const fileExtension = req.file.mimetype.split("/") || "jpg";
+  const filename = `img_${shortId}.${fileExtension}`;
+
+  // 2. AUTOMATIC HOSTNAME DETECTOR:
+  // Local Dev -> http://localhost:5000/uploads/img_a1b2c3.jpg
+  // Vercel Live -> https://vercel.app
+  const absoluteHostUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
+
+  return absoluteHostUrl;
+};
 
 // Helper function to safely process nested address properties sent via form-data strings
 const parseAddressField = (address) => {
@@ -58,13 +74,12 @@ export const getProfile = async (req, res) => {
 };
 
 // ====================================================
-// ✅ UPDATE PROFILE CONTROLLER (With Self-Healing Fallback)
+// ✅ UPDATE PROFILE CONTROLLER (Short Form URL Engine)
 // ====================================================
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(401).json({ error: "Unauthorized. Profile ownership validation failed." });
     }
 
@@ -78,23 +93,11 @@ export const updateProfile = async (req, res) => {
       targetProfile = new Profile({ user: userId });
     }
 
-    let imageUrl = targetProfile.avatar;
-
-    // Process new image upload if present and scrub old file off disk
+    // 3. 🎯 FIXED FOR SHORT CODES: Process file entirely in memory and map to an optimized text path URL string
     if (req.file) {
-      imageUrl = `${req.protocol}://${req.get('host')}/uploads/profileImage/${req.file.filename}`;
-      
-      if (targetProfile.avatar) {
-        try {
-          const oldFileName = path.basename(targetProfile.avatar);
-          const oldFilePath = path.join(process.cwd(), 'uploads', 'profileImage', oldFileName);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
-        } catch (err) {
-          console.error("⚠️ Old asset cleaning failure notice:", err.message);
-        }
-      }
+      const shortFormAvatarUrl = generateShortImageUrl(req);
+      targetProfile.avatar = shortFormAvatarUrl; // 🎯 Stores: https://vercel.app
+      console.log("📸 New short-form avatar URL generated successfully.");
     }
 
     // Process nested schema objects safely from multi-part fields
@@ -103,7 +106,6 @@ export const updateProfile = async (req, res) => {
       try {
         parsedAddress = parseAddressField(address);
       } catch (parseError) {
-        if (req.file) fs.unlinkSync(req.file.path);
         return res.status(400).json({ error: parseError.message });
       }
     }
@@ -111,7 +113,6 @@ export const updateProfile = async (req, res) => {
     // Bind fields to schema structures safely 
     if (bio !== undefined) targetProfile.bio = bio.trim();
     if (gender !== undefined) targetProfile.gender = gender;
-    targetProfile.avatar = imageUrl;
 
     // Prevent empty string date-casting crashes by assigning null
     if (dateOfBirth !== undefined) {
@@ -132,7 +133,6 @@ export const updateProfile = async (req, res) => {
     return res.status(200).json({ success: true, data: updatedProfile });
 
   } catch (error) {
-    if (req.file) fs.unlinkSync(req.file.path);
     console.error("❌ Fatal breakdown inside updateProfile runtime engine:", error.message);
     return res.status(500).json({ error: "Internal Server Error", details: error.message });
   }

@@ -2,10 +2,9 @@
   "name": "server",
   "version": "1.0.0",
   "type": "module",
-  "main": "server.js",
-  "scripts": {
+  "main": "server.mjs",
+    "scripts": {
     "dev": "nodemon --env-file=.env server.js",
-    "start": "node server.js",
     "start:local": "node --env-file=.env server.js",
     "start:staging": "node --env-file=.env.staging server.js",
     "start:production": "node --env-file=.env.production server.js"
@@ -15,6 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -28,3 +28,6 @@
     "nodemon": "^3.1.14"
   }
 }
+
+
+

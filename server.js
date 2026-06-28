@@ -2,8 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path'; 
-import fs from 'fs'; 
-// 🎯 CHANGED: Import the database connection function instead of a static object
 import connectDB from './config/db.js'; 
 import userRouter from './router/userRouter.js';
 import productRouter from './router/productRouter.js';
@@ -14,18 +12,17 @@ import profileRouter from './router/profileRouter.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Dynamic CORS based on loaded environment file
+// Dynamic CORS configurations
 const allowedOrigins = [
-  'http://localhost:5173',
-  'https://shyamindustries.vercel.app',
-  process.env.CLIENT_URL
-].filter(Boolean); // Cleans out any undefined/null values safely
+  'http://localhost:5173',               
+  'http://localhost:5174',               
+  'https://shyamindustries.vercel.app',  // 🎯 FIXED: Corrected to match your actual live frontend domain
+  process.env.CLIENT_URL                 
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allows requests with no origin (like mobile apps, Postman, curl, or internal server calls)
     if (!origin) return callback(null, true);
-    
     if (allowedOrigins.indexOf(origin) !== -1) {
       return callback(null, true);
     } else {
@@ -36,28 +33,27 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// 🎯 Safe local static folder loading (only attaches if the directory exists)
-const uploadsPath = path.join(process.cwd(), 'uploads');
-if (fs.existsSync(uploadsPath)) {
-  app.use('/uploads', express.static(uploadsPath));
-}
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// 🎯 ADDED: Middleware to ensure MongoDB is connected before processing ANY request on Vercel
+// Dynamic serverless database connection wrapper middleware
 app.use(async (req, res, next) => {
   try {
     await connectDB();
     next();
   } catch (err) {
-    res.status(500).json({ 
+    console.error("❌ Database Connection Intercept Error:", err.message);
+    return res.status(500).json({ 
+      success: false,
       error: "Database Connection Error", 
-      details: process.env.NODE_ENV !== 'production' ? err.message : "Could not connect to database backend"
+      details: err.message
     });
   }
 });
 
 app.get('/', (req, res) => {
-  res.send(`Hello Sunil! Running in ${process.env.NODE_ENV || 'production'} mode.`);
+  res.send(`Hello Sunil! Running in ${process.env.NODE_ENV || 'development'} mode.`);
 });
 
 app.use('/user', userRouter);
@@ -66,12 +62,21 @@ app.use('/cart', cartRouter);
 app.use('/wishlist', wishlistRouter);
 app.use('/profile', profileRouter);
 
-// 🎯 Conditional listen: Avoids locking port issues during Vercel builds
+// Global Centralized Error Handler
+app.use((err, req, res, next) => {
+  console.error("💥 Backend Caught Exception:", err);
+  return res.status(500).json({
+    success: false,
+    message: "An internal server error occurred during processing",
+    error: err.message
+  });
+});
+
+// Conditional port listen loops for local execution environments
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Server running in [${process.env.NODE_ENV || 'development'}] mode on port ${PORT}`);
   });
 }
 
-// 🎯 CRITICAL FOR VERCEL: Export the application instance
 export default app;
