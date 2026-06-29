@@ -9,9 +9,9 @@ const profileSchema = new mongoose.Schema({
   },
 
   avatar: {
-    type: String,
-    default: ""
-},
+    data: Buffer,
+    contentType: String,
+  },
 
   bio: {
     type: String,
