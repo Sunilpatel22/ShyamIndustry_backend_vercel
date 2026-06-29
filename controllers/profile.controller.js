@@ -57,57 +57,49 @@ export const getProfile = async (req, res) => {
 // ====================================================
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized. Validation failed." });
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    const userId = req.user.id;
+
+    let profile = await Profile.findOne({ user: userId });
+
+    if (!profile) {
+      profile = new Profile({
+        user: userId,
+      });
     }
 
-    const { bio, dateOfBirth, gender, address } = req.body;
-    
-    let targetProfile = await Profile.findOne({ user: userId });
-    if (!targetProfile) targetProfile = new Profile({ user: userId });
-
-    // 🎯 DATABASE SERVER DIRECT WRITING LAYER: 
-    // Converts your RAM buffer to a clean Base64 URL string and assigns it straight to your Atlas schema.
-    // This bypasses file directories entirely, preventing folder errors!
+    // Save image in MongoDB Atlas
     if (req.file) {
-      const base64Avatar = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-      targetProfile.avatar = base64Avatar; 
-      console.log("📸 Avatar data generated for database server storage.");
+      profile.avatar = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
+        "base64"
+      )}`;
     }
 
-    let parsedAddress = null;
-    if (address) {
-      try {
-        parsedAddress = parseAddressField(address);
-      } catch (parseError) {
-        return res.status(400).json({ error: parseError.message });
-      }
+    profile.bio = req.body.bio || "";
+    profile.gender = req.body.gender || "prefer not to say";
+
+    if (req.body.dateOfBirth) {
+      profile.dateOfBirth = req.body.dateOfBirth;
     }
 
-    if (bio !== undefined) targetProfile.bio = bio.trim();
-    if (gender !== undefined) targetProfile.gender = gender;
-
-    if (dateOfBirth !== undefined) {
-      targetProfile.dateOfBirth = (dateOfBirth === "" || dateOfBirth === null) ? null : new Date(dateOfBirth);
+    if (req.body.address) {
+      profile.address = JSON.parse(req.body.address);
     }
 
-    if (parsedAddress) {
-      targetProfile.address = {
-        street: parsedAddress.street !== undefined ? parsedAddress.street.trim() : (targetProfile.address?.street || ""),
-        city: parsedAddress.city !== undefined ? parsedAddress.city.trim() : (targetProfile.address?.city || ""),
-        state: parsedAddress.state !== undefined ? parsedAddress.state.trim() : (targetProfile.address?.state || ""),
-        zipCode: parsedAddress.zipCode !== undefined ? parsedAddress.zipCode.trim() : (targetProfile.address?.zipCode || ""),
-        country: parsedAddress.country !== undefined ? parsedAddress.country.trim() : (targetProfile.address?.country || "")
-      };
-    }
+    await profile.save();
 
-    // Comit data changes straight to your cloud server database
-    const updatedProfile = await targetProfile.save();
-    return res.status(200).json({ success: true, data: updatedProfile });
+    return res.status(200).json({
+      success: true,
+      data: profile,
+    });
+  } catch (err) {
+    console.error(err);
 
-  } catch (error) {
-    console.error("❌ Profile persistence breakdown on database server:", error.message);
-    return res.status(500).json({ error: "Internal Server Error", details: error.message });
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 };
