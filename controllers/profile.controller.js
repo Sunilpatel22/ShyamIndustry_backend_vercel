@@ -1,22 +1,4 @@
 import Profile from "../models/profileSchema.js";
-import crypto from "crypto";
-
-// 🎯 INTERNAL HELPER: Converts memory buffers into a shortened hostname string URL
-const generateShortImageUrl = (req) => {
-  if (!req.file) return "";
-
-  // 1. Generate a small 8-character unique fingerprint filename
-  const shortId = crypto.randomBytes(4).toString("hex"); 
-  const fileExtension = req.file.mimetype.split("/") || "jpg";
-  const filename = `img_${shortId}.${fileExtension}`;
-
-  // 2. AUTOMATIC HOSTNAME DETECTOR:
-  // Local Dev -> http://localhost:5000/uploads/img_a1b2c3.jpg
-  // Vercel Live -> https://vercel.app
-  const absoluteHostUrl = `${req.protocol}://${req.get("host")}/uploads/${filename}`;
-
-  return absoluteHostUrl;
-};
 
 // Helper function to safely process nested address properties sent via form-data strings
 const parseAddressField = (address) => {
@@ -32,7 +14,7 @@ const parseAddressField = (address) => {
 };
 
 // ====================================================
-// ✅ GET PROFILE CONTROLLER (With Self-Healing Creation)
+// ✅ GET PROFILE CONTROLLER (Database Server Linked)
 // ====================================================
 export const getProfile = async (req, res) => {
   try {
@@ -41,15 +23,13 @@ export const getProfile = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized. User session token missing." });
     }
 
-    // 1. Attempt to find the user profile
     let profile = await Profile.findOne({ user: userId }).populate(
       "user",
       "fullname email mobileNumber role"
     );
 
-    // 2. 🎯 SELF-HEALING HOOK: Auto-create a skeleton profile if a legacy user doesn't have one
+    // Self-healing skeleton block to avoid empty profiles on initialization
     if (!profile) {
-      console.log(`💡 Legacy account detected for User ID: ${userId}. Initializing profile shell...`);
       const newProfileShell = new Profile({
         user: userId,
         avatar: "",
@@ -57,9 +37,8 @@ export const getProfile = async (req, res) => {
         address: { street: "", city: "", state: "", zipCode: "", country: "" },
         gender: "prefer not to say"
       });
-      await newProfileShell.save();
+      await newProfileShell.save(); // Writes to your remote Atlas database server
 
-      // Fetch the newly created profile with populated user details
       profile = await Profile.findOne({ user: userId }).populate(
         "user",
         "fullname email mobileNumber role"
@@ -68,39 +47,35 @@ export const getProfile = async (req, res) => {
 
     return res.status(200).json({ success: true, data: profile });
   } catch (error) {
-    console.error("❌ Database tracking error inside getProfile:", error.message);
+    console.error("❌ Profile fetch database error:", error.message);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
 // ====================================================
-// ✅ UPDATE PROFILE CONTROLLER (Short Form URL Engine)
+// ✅ UPDATE PROFILE CONTROLLER (Database Server Upload)
 // ====================================================
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ error: "Unauthorized. Profile ownership validation failed." });
+      return res.status(401).json({ error: "Unauthorized. Validation failed." });
     }
 
     const { bio, dateOfBirth, gender, address } = req.body;
     
-    // 1. Attempt to find target profile
     let targetProfile = await Profile.findOne({ user: userId });
-    
-    // 2. 🎯 SELF-HEALING HOOK: Fallback instantiation if document is missing
-    if (!targetProfile) {
-      targetProfile = new Profile({ user: userId });
-    }
+    if (!targetProfile) targetProfile = new Profile({ user: userId });
 
-    // 3. 🎯 FIXED FOR SHORT CODES: Process file entirely in memory and map to an optimized text path URL string
+    // 🎯 DATABASE SERVER DIRECT WRITING LAYER: 
+    // Converts your RAM buffer to a clean Base64 URL string and assigns it straight to your Atlas schema.
+    // This bypasses file directories entirely, preventing folder errors!
     if (req.file) {
-      const shortFormAvatarUrl = generateShortImageUrl(req);
-      targetProfile.avatar = shortFormAvatarUrl; // 🎯 Stores: https://vercel.app
-      console.log("📸 New short-form avatar URL generated successfully.");
+      const base64Avatar = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      targetProfile.avatar = base64Avatar; 
+      console.log("📸 Avatar data generated for database server storage.");
     }
 
-    // Process nested schema objects safely from multi-part fields
     let parsedAddress = null;
     if (address) {
       try {
@@ -110,11 +85,9 @@ export const updateProfile = async (req, res) => {
       }
     }
 
-    // Bind fields to schema structures safely 
     if (bio !== undefined) targetProfile.bio = bio.trim();
     if (gender !== undefined) targetProfile.gender = gender;
 
-    // Prevent empty string date-casting crashes by assigning null
     if (dateOfBirth !== undefined) {
       targetProfile.dateOfBirth = (dateOfBirth === "" || dateOfBirth === null) ? null : new Date(dateOfBirth);
     }
@@ -129,11 +102,12 @@ export const updateProfile = async (req, res) => {
       };
     }
 
+    // Comit data changes straight to your cloud server database
     const updatedProfile = await targetProfile.save();
     return res.status(200).json({ success: true, data: updatedProfile });
 
   } catch (error) {
-    console.error("❌ Fatal breakdown inside updateProfile runtime engine:", error.message);
+    console.error("❌ Profile persistence breakdown on database server:", error.message);
     return res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 };
