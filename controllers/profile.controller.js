@@ -12,43 +12,34 @@ const parseAddress = (address) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
-
-    let profile = await Profile.findOne({ user: userId }).populate(
-      "user",
-      "fullname email mobileNumber role"
-    );
+    const profile = await Profile.findOne({
+      user: req.user.id,
+    }).populate("user", "fullname email");
 
     if (!profile) {
-      profile = await Profile.create({
-        user: userId,
+      return res.status(404).json({
+        message: "Profile not found",
       });
-
-      profile = await Profile.findById(profile._id).populate(
-        "user",
-        "fullname email mobileNumber role"
-      );
     }
 
-    const profileObj = profile.toObject();
+    const avatarUrl = profile.avatar?.data
+      ? `${req.protocol}://${req.get("host")}/profile/avatar/${profile._id}`
+      : null;
 
-    if (profileObj.avatar?.data) {
-      profileObj.avatar = `data:${profileObj.avatar.contentType};base64,${Buffer.from(
-        profileObj.avatar.data
-      ).toString("base64")}`;
-    } else {
-      profileObj.avatar = "";
-    }
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      data: profileObj,
+      data: {
+        _id: profile._id,
+        user: profile.user,
+        bio: profile.bio,
+        gender: profile.gender,
+        address: profile.address,
+        dateOfBirth: profile.dateOfBirth,
+        avatar: avatarUrl,
+      },
     });
   } catch (err) {
-    console.log(err);
-
-    return res.status(500).json({
-      success: false,
+    res.status(500).json({
       error: err.message,
     });
   }
@@ -58,14 +49,10 @@ export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    let profile = await Profile.findOne({
-      user: userId,
-    });
+    let profile = await Profile.findOne({ user: userId });
 
     if (!profile) {
-      profile = new Profile({
-        user: userId,
-      });
+      profile = new Profile({ user: userId });
     }
 
     if (req.file) {
@@ -77,38 +64,48 @@ export const updateProfile = async (req, res) => {
 
     profile.bio = req.body.bio || "";
 
-    profile.gender =
-      req.body.gender || "prefer not to say";
+    profile.gender = req.body.gender || "prefer not to say";
 
     if (req.body.dateOfBirth) {
       profile.dateOfBirth = req.body.dateOfBirth;
     }
 
     if (req.body.address) {
-      profile.address = parseAddress(req.body.address);
+      profile.address = JSON.parse(req.body.address);
     }
 
     await profile.save();
 
-    const profileObj = profile.toObject();
-
-    if (profileObj.avatar?.data) {
-      profileObj.avatar = `data:${profileObj.avatar.contentType};base64,${Buffer.from(
-        profileObj.avatar.data
-      ).toString("base64")}`;
-    } else {
-      profileObj.avatar = "";
-    }
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      data: profileObj,
+      message: "Profile Updated",
+      data: profile,
     });
   } catch (err) {
     console.log(err);
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
+      error: err.message,
+    });
+  }
+};
+
+export const getAvatar = async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id);
+
+    if (!profile || !profile.avatar || !profile.avatar.data) {
+      return res.status(404).json({
+        message: "Image not found",
+      });
+    }
+
+    res.set("Content-Type", profile.avatar.contentType);
+
+    res.send(profile.avatar.data);
+  } catch (err) {
+    res.status(500).json({
       error: err.message,
     });
   }
