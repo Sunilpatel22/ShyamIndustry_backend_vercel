@@ -23,21 +23,21 @@ export const getProfile = async (req, res) => {
     }
 
     const avatarUrl = profile.avatar?.data
-      ? `${req.protocol}://${req.get("host")}/profile/avatar/${profile._id}`
-      : null;
+  ? `${req.protocol}://${req.get("host")}/profile/avatar/${profile._id}`
+  : null;
 
-    res.status(200).json({
-      success: true,
-      data: {
-        _id: profile._id,
-        user: profile.user,
-        bio: profile.bio,
-        gender: profile.gender,
-        address: profile.address,
-        dateOfBirth: profile.dateOfBirth,
-        avatar: avatarUrl,
-      },
-    });
+res.json({
+    success:true,
+    data:{
+        _id:profile._id,
+        bio:profile.bio,
+        gender:profile.gender,
+        address:profile.address,
+        dateOfBirth:profile.dateOfBirth,
+        user:profile.user,
+        avatar:avatarUrl
+    }
+})
   } catch (err) {
     res.status(500).json({
       error: err.message,
